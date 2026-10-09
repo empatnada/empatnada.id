@@ -4,13 +4,20 @@ import { useState, useEffect, useCallback } from "react";
 // Import Server Actions dari Tim Backend
 import { getAdminOrders, updateOrderStatus } from "@/actions/admin";
 
-// Tipe data berdasarkan instruksi backend
+// Tipe data disesuaikan dengan struktur kolom database Supabase
 type Order = {
-  id: string;
-  pt: string;
-  kirim: string; // 'pending' | 'shipped' | 'delivered'
-  bayar: string; // 'unpaid' | 'dp_paid' | 'paid'
-  tanggal: string;
+  id_resi: string;
+  id_user: string;
+  rute_muat: string;
+  rute_bongkar: string;
+  jarak_km: number;
+  total_harga: number;
+  status_bayar: string; // 'unpaid' | 'dp_paid' | 'paid'
+  status_kirim: string; // 'pending' | 'shipped' | 'delivered'
+  created_at: string;
+  users_extended?: {
+    phone_number?: string;
+  };
 };
 
 export default function AdminDashboard() {
@@ -33,19 +40,20 @@ export default function AdminDashboard() {
     };
   }, [searchInput]);
 
-  // 2. Fetcher Data dari Database (Temicu saat filter / debounce berubah)
+  // 2. Fetcher Data dari Database (Termicu saat filter / debounce berubah)
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Memanggil fungsi dari Backend
-      const data = await getAdminOrders(debouncedSearch, shippingFilter, paymentFilter);
-      setOrders(data || []);
+      // Memanggil fungsi dari Backend yang mengembalikan objek { success, data, message }
+      const res = await getAdminOrders(debouncedSearch, shippingFilter, paymentFilter);
+      if (res.success && res.data) {
+        setOrders(res.data as Order[]);
+      } else {
+        setOrders([]);
+      }
     } catch (error) {
       console.error("Gagal mengambil data resi:", error);
-      // Fallback dummy data jika action backend gagal saat testing
-      setOrders([
-        { id: "RS-1001", pt: "PT. Maju Mundur", kirim: "pending", bayar: "unpaid", tanggal: "10 Okt 2026" }
-      ]);
+      setOrders([]);
     } finally {
       setIsLoading(false);
     }
@@ -55,17 +63,21 @@ export default function AdminDashboard() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // 3. Handler Update Status (Terkoneksi ke tombol Card)
-  const handleUpdate = async (id: string, jenis: "kirim" | "bayar", value: string) => {
+  // 3. Handler Update Status (Disesuaikan dengan signature objek backend)
+  const handleUpdate = async (id_resi: string, jenis: "kirim" | "bayar", value: string) => {
     try {
-      if (jenis === "kirim") {
-        await updateOrderStatus(id, value, ""); // Parameter bayar dikosongkan jika hanya update kirim
+      const payload = jenis === "kirim" 
+        ? { status_kirim: value } 
+        : { status_bayar: value };
+
+      const res = await updateOrderStatus(id_resi, payload);
+      if (res.success) {
+        fetchOrders(); // Refresh data setelah sukses update
       } else {
-        await updateOrderStatus(id, "", value); // Parameter kirim dikosongkan jika hanya update bayar
+        alert(res.message);
       }
-      fetchOrders(); // Refresh data setelah sukses update
     } catch (error) {
-      console.error(`Gagal update status resi ${id}:`, error);
+      console.error(`Gagal update status resi ${id_resi}:`, error);
       alert("Gagal memperbarui status. Cek koneksi database.");
     }
   };
@@ -82,7 +94,7 @@ export default function AdminDashboard() {
         <div className="form-control w-full relative">
           <input 
             type="text" 
-            placeholder="🔍 Cari Resi / Nama PT..." 
+            placeholder="🔍 Cari Resi (UUID)..." 
             className="input input-bordered w-full focus:input-primary"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
@@ -122,44 +134,53 @@ export default function AdminDashboard() {
         </h2>
         
         {orders.map((item) => (
-          <div key={item.id} className="card bg-base-100 shadow-md border border-base-200">
+          <div key={item.id_resi} className="card bg-base-100 shadow-md border border-base-200">
             <div className="card-body p-4">
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <h3 className="font-bold text-lg">{item.id}</h3>
-                  <p className="text-sm text-base-content/70">{item.pt}</p>
+                  <h3 className="font-bold text-sm truncate max-w-[200px]" title={item.id_resi}>
+                    Resi: {item.id_resi}
+                  </h3>
+                  <p className="text-xs text-base-content/70 mt-1">
+                    📍 {item.rute_muat} ➔ {item.rute_bongkar}
+                  </p>
+                  <p className="text-xs font-semibold text-primary mt-1">
+                    Rp {item.total_harga?.toLocaleString('id-ID')} ({item.jarak_km} KM)
+                  </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-base-content/50">{item.tanggal}</p>
+                  <p className="text-xs text-base-content/50">
+                    {new Date(item.created_at).toLocaleDateString('id-ID')}
+                  </p>
                 </div>
               </div>
               
               <div className="flex gap-2 mt-2">
                 <span className={`badge badge-sm ${
-                  item.kirim === 'delivered' ? 'badge-success' : item.kirim === 'shipped' ? 'badge-info' : 'badge-warning'
+                  item.status_kirim === 'delivered' ? 'badge-success' : item.status_kirim === 'shipped' ? 'badge-info' : 'badge-warning'
                 }`}>
-                  Kirim: {item.kirim}
+                  Kirim: {item.status_kirim}
                 </span>
                 <span className={`badge badge-sm ${
-                  item.bayar === 'paid' ? 'badge-success' : item.bayar === 'dp_paid' ? 'badge-primary' : 'badge-error'
+                  item.status_bayar === 'paid' ? 'badge-success' : item.status_bayar === 'dp_paid' ? 'badge-primary' : 'badge-error'
                 }`}>
-                  Bayar: {item.bayar}
+                  Bayar: {item.status_bayar}
                 </span>
               </div>
               
               {/* Action Buttons terhubung ke Backend */}
               <div className="card-actions justify-end mt-4 border-t border-base-200 pt-3">
-                {item.kirim !== 'delivered' && (
+                {item.status_kirim !== 'delivered' && (
                   <button 
-                    onClick={() => handleUpdate(item.id, 'kirim', 'delivered')}
+                    onClick={() => handleUpdate(item.id_resi, 'kirim', 'delivered')}
                     className="btn btn-outline btn-info btn-xs"
                   >
                     Tandai Dikirim
                   </button>
                 )}
-                {item.bayar !== 'paid' && (
+                {item.status_bayar !== 'paid' && (
                   <button 
-                    onClick={() => handleUpdate(item.id, 'bayar', 'paid')}
+                    onClick={() => handleUpdate(item.id_resi, 'bayar', 'paid')}
                     className="btn btn-primary btn-xs"
                   >
                     Tandai Lunas
