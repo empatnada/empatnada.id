@@ -1,2 +1,21 @@
 @import "tailwindcss";
 @plugin "daisyui";
+
+@layer base {
+  :root {
+    --p: 355 91% 45%;  /* Representasi warna merah #E30613 untuk daisyUI primary */
+    --pf: 355 91% 38%;
+    --pc: 0 0% 100%;
+  }
+}
+
+/* Tema khusus untuk modul logistik */
+[data-theme="logistik-theme"] {
+  --p: 355 91% 45%;   /* #E30613 */
+  --pf: 355 91% 38%;
+  --pc: 0 0% 100%;
+  --b1: 0 0% 100%;    /* base-100: #FFFFFF */
+  --b2: 210 20% 95%;  /* base-200: #F3F4F6 */
+  --a: 33 55% 58%;    /* accent: #D29F68 */
+  --s: 0 0% 10%;      /* secondary: #1A1A1A */
+}
