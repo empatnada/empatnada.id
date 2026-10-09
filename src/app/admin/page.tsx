@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 // Import Server Actions dari Tim Backend
-import { getAdminOrders, updateOrderStatus } from "@/actions/admin";
+import { getAdminOrders, updateOrderStatus } from "../../actions/admin";
 
 // Tipe data disesuaikan dengan struktur kolom database Supabase
 type Order = {
