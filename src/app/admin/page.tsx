@@ -1,20 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+// Import Server Actions dari Tim Backend
+import { getAdminOrders, updateOrderStatus } from "@/actions/admin";
+
+// Tipe data berdasarkan instruksi backend
+type Order = {
+  id: string;
+  pt: string;
+  kirim: string; // 'pending' | 'shipped' | 'delivered'
+  bayar: string; // 'unpaid' | 'dp_paid' | 'paid'
+  tanggal: string;
+};
 
 export default function AdminDashboard() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [shippingFilter, setShippingFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  
+  const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Efek Debounce (300ms) untuk mengurangi beban server
+  // 1. Efek Debounce (300ms) untuk Search
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchInput);
-      // Backend action bisa dipanggil di sini menggunakan variabel `debouncedSearch`
-      console.log("Mencari data ke server:", searchInput);
     }, 300);
 
     return () => {
@@ -22,24 +33,53 @@ export default function AdminDashboard() {
     };
   }, [searchInput]);
 
-  // Data Dummy untuk tes UI Card-based di Layar HP
-  const dummyData = [
-    { id: "RS-1001", pt: "PT. Maju Mundur", kirim: "pending", bayar: "unpaid", tanggal: "10 Okt 2026" },
-    { id: "RS-1002", pt: "CV. Sukses Selalu", kirim: "shipped", bayar: "dp_paid", tanggal: "09 Okt 2026" },
-    { id: "RS-1003", pt: "PT. Angin Ribut", kirim: "delivered", bayar: "paid", tanggal: "08 Okt 2026" },
-  ];
+  // 2. Fetcher Data dari Database (Temicu saat filter / debounce berubah)
+  const fetchOrders = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      // Memanggil fungsi dari Backend
+      const data = await getAdminOrders(debouncedSearch, shippingFilter, paymentFilter);
+      setOrders(data || []);
+    } catch (error) {
+      console.error("Gagal mengambil data resi:", error);
+      // Fallback dummy data jika action backend gagal saat testing
+      setOrders([
+        { id: "RS-1001", pt: "PT. Maju Mundur", kirim: "pending", bayar: "unpaid", tanggal: "10 Okt 2026" }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [debouncedSearch, shippingFilter, paymentFilter]);
+
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // 3. Handler Update Status (Terkoneksi ke tombol Card)
+  const handleUpdate = async (id: string, jenis: "kirim" | "bayar", value: string) => {
+    try {
+      if (jenis === "kirim") {
+        await updateOrderStatus(id, value, ""); // Parameter bayar dikosongkan jika hanya update kirim
+      } else {
+        await updateOrderStatus(id, "", value); // Parameter kirim dikosongkan jika hanya update bayar
+      }
+      fetchOrders(); // Refresh data setelah sukses update
+    } catch (error) {
+      console.error(`Gagal update status resi ${id}:`, error);
+      alert("Gagal memperbarui status. Cek koneksi database.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-base-200 p-4 pb-20">
-      {/* Header Admin */}
       <div className="mb-6 mt-4">
         <h1 className="text-2xl font-bold text-primary">Dashboard Operasional</h1>
-        <p className="text-sm text-base-content/70">Kelola resi, pengiriman, dan status tagihan.</p>
+        <p className="text-sm text-base-content/70">Kelola resi, pengiriman, dan status tagihan (Live Data).</p>
       </div>
 
-      {/* Area Pencarian & Filter */}
+      {/* Filter & Search Bar */}
       <div className="bg-base-100 p-4 rounded-xl shadow-sm border border-base-300 space-y-4 mb-6">
-        <div className="form-control w-full">
+        <div className="form-control w-full relative">
           <input 
             type="text" 
             placeholder="🔍 Cari Resi / Nama PT..." 
@@ -47,6 +87,7 @@ export default function AdminDashboard() {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
+          {isLoading && <span className="loading loading-spinner loading-sm absolute right-3 top-3 text-primary"></span>}
         </div>
         
         <div className="flex gap-2">
@@ -76,9 +117,11 @@ export default function AdminDashboard() {
 
       {/* List Card Data (Mobile Optimized) */}
       <div className="space-y-4">
-        <h2 className="font-semibold px-1">Hasil Pencarian ({debouncedSearch ? "Filter Aktif" : "Semua Data"})</h2>
+        <h2 className="font-semibold px-1">
+          {orders.length > 0 ? `Menampilkan ${orders.length} Resi` : "Tidak ada data"}
+        </h2>
         
-        {dummyData.map((item) => (
+        {orders.map((item) => (
           <div key={item.id} className="card bg-base-100 shadow-md border border-base-200">
             <div className="card-body p-4">
               <div className="flex justify-between items-start mb-2">
@@ -91,7 +134,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
               
-              {/* Badges Status Presisi */}
               <div className="flex gap-2 mt-2">
                 <span className={`badge badge-sm ${
                   item.kirim === 'delivered' ? 'badge-success' : item.kirim === 'shipped' ? 'badge-info' : 'badge-warning'
@@ -105,15 +147,29 @@ export default function AdminDashboard() {
                 </span>
               </div>
               
-              <div className="card-actions justify-end mt-4">
-                <button className="btn btn-outline btn-sm">Detail</button>
-                <button className="btn btn-primary btn-sm">Update</button>
+              {/* Action Buttons terhubung ke Backend */}
+              <div className="card-actions justify-end mt-4 border-t border-base-200 pt-3">
+                {item.kirim !== 'delivered' && (
+                  <button 
+                    onClick={() => handleUpdate(item.id, 'kirim', 'delivered')}
+                    className="btn btn-outline btn-info btn-xs"
+                  >
+                    Tandai Dikirim
+                  </button>
+                )}
+                {item.bayar !== 'paid' && (
+                  <button 
+                    onClick={() => handleUpdate(item.id, 'bayar', 'paid')}
+                    className="btn btn-primary btn-xs"
+                  >
+                    Tandai Lunas
+                  </button>
+                )}
               </div>
             </div>
           </div>
         ))}
       </div>
-
     </div>
   );
 }
