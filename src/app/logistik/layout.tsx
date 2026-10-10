@@ -1,3 +1,5 @@
+import FloatingWhatsApp from "@/components/FloatingWhatsApp";
+
 export default function LogistikLayout({
   children,
 }: {
@@ -5,8 +7,9 @@ export default function LogistikLayout({
 }) {
   return (
     // Membungkus khusus modul ini dengan logistik-theme dan memaksa background base-100/200
-    <div data-theme="logistik-theme" className="min-h-screen bg-base-100 text-base-content antialiased">
+    <div data-theme="logistik-theme" className="min-h-screen bg-base-100 text-base-content antialiased relative">
       {children}
+      <FloatingWhatsApp />
     </div>
   );
 }
