@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 
-// Helper untuk melakukan Geocoding alamat teks menjadi koordinat (Lat, Lon) menggunakan Nominatim OpenStreetMap
+// Helper untuk melakukan Geocoding alamat teks menjadi koordinat menggunakan Nominatim
 async function getCoordinates(address: string) {
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+    // Jika input terlalu singkat (misal hanya kota), kita tambahkan "Jawa Timur, Indonesia" agar Nominatim mudah menemukannya
+    let queryAddress = address.trim();
+    if (queryAddress.toLowerCase() === "mojokerto") {
+      queryAddress = "Mojokerto, Jawa Timur, Indonesia";
+    } else if (queryAddress.toLowerCase().includes("tanjung perak")) {
+      queryAddress = "Pelabuhan Tanjung Perak, Surabaya, Jawa Timur, Indonesia";
+    }
+
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryAddress)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        // Nominatim mewajibkan User-Agent yang valid sesuai kebijakan penggunaan mereka
         "User-Agent": "EmpatnadaLogistikApp/1.0 (admin@empatnada.id)"
       }
     });
@@ -38,7 +45,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 1. Konversi alamat asal (origin) ke koordinat
     const originCoord = await getCoordinates(originAddress);
     if (!originCoord) {
       return NextResponse.json(
@@ -47,7 +53,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Konversi alamat tujuan (destination) ke koordinat
     const destinationCoord = await getCoordinates(destinationAddress);
     if (!destinationCoord) {
       return NextResponse.json(
@@ -56,8 +61,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Kirim koordinat (Lon, Lat format OSRM) ke OSRM API untuk menghitung jarak rute berkendara
-    // Format OSRM: {longitude},{latitude};{longitude},{latitude}
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${originCoord.lon},${originCoord.lat};${destinationCoord.lon},${destinationCoord.lat}?overview=false`;
     
     const osrmResponse = await fetch(osrmUrl);
@@ -70,11 +73,9 @@ export async function POST(request: Request) {
       );
     }
 
-    // OSRM mengembalikan jarak dalam meter, kita konversi ke Kilometer (dibulatkan ke 2 desimal)
     const distanceMeters = osrmData.routes[0].distance;
     const distanceKm = Math.round((distanceMeters / 1000) * 100) / 100;
     
-    // Estimasi durasi dalam detik, dikonversi ke menit
     const durationSeconds = osrmData.routes[0].duration;
     const durationMinutes = Math.round(durationSeconds / 60);
 
