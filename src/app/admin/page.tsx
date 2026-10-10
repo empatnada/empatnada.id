@@ -68,19 +68,19 @@ export default function AdminDashboard() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // 3. Handler Update Status menggunakan metode PATCH ke API Routes
+  // 3. Handler Update Status (Disesuaikan dengan bungkus 'updateData' agar sinkron dengan backend route.ts)
   const handleUpdate = async (id_resi: string, jenis: "kirim" | "bayar", value: string) => {
     try {
-      const payload = jenis === "kirim" 
-        ? { id_resi, status_kirim: value } 
-        : { id_resi, status_bayar: value };
+      const updateData = jenis === "kirim" 
+        ? { status_kirim: value } 
+        : { status_bayar: value };
 
       const response = await fetch('/api/admin/orders', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ id_resi, updateData }),
       });
 
       const res = await response.json();
