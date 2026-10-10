@@ -19,7 +19,7 @@ export default function LogistikPage() {
 
     setIsCalculating(true);
     try {
-      const res = await fetch("/api/logistik/route", {
+      const res = await fetch("/api/logistik", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
