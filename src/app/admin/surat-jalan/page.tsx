@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
-export default function SuratJalanPage() {
+function SuratJalanContent() {
   const searchParams = useSearchParams();
   const resiId = searchParams.get('id') || 'ORD-2026-001';
 
@@ -154,5 +154,13 @@ export default function SuratJalanPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function SuratJalanPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-600">Memuat Surat Jalan...</div>}>
+      <SuratJalanContent />
+    </Suspense>
   );
 }
