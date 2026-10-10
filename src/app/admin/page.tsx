@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-// Tipe data disesuaikan dengan struktur kolom database Supabase
+// Tipe data disesuaikan dengan workflow anti-fiktif & status operasional
 type Order = {
   id_resi: string;
   id_user: string;
@@ -11,8 +11,9 @@ type Order = {
   jarak_km: number;
   total_harga: number;
   status_bayar: string; // 'unpaid' | 'dp_paid' | 'paid'
-  status_kirim: string; // 'pending' | 'shipped' | 'delivered'
+  status_kirim: string; // 'pending_verification' | 'verified' | 'shipped' | 'delivered' | 'rejected'
   created_at: string;
+  customer_phone?: string;
   users_extended?: {
     phone_number?: string;
   };
@@ -38,7 +39,7 @@ export default function AdminDashboard() {
     };
   }, [searchInput]);
 
-  // 2. Fetcher Data menggunakan API Routes standar (Aman dari Origin mismatch Codespaces)
+  // 2. Fetcher Data menggunakan API Routes standar
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -52,7 +53,7 @@ export default function AdminDashboard() {
       const res = await response.json();
 
       if (res.success && res.data) {
-        setOrders(res.data as Order[]);
+        setOrders(res.data as Order[] | any[]);
       } else {
         setOrders([]);
       }
@@ -68,7 +69,7 @@ export default function AdminDashboard() {
     fetchOrders();
   }, [fetchOrders]);
 
-  // 3. Handler Update Status (Disesuaikan dengan bungkus 'updateData' agar sinkron dengan backend route.ts)
+  // 3. Handler Update Status (Anti-Fiktif & Operasional)
   const handleUpdate = async (id_resi: string, jenis: "kirim" | "bayar", value: string) => {
     try {
       const updateData = jenis === "kirim" 
@@ -100,7 +101,7 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-base-200 p-4 pb-20">
       <div className="mb-6 mt-4">
         <h1 className="text-2xl font-bold text-primary">Dashboard Operasional</h1>
-        <p className="text-sm text-base-content/70">Kelola resi, pengiriman, dan status tagihan (API Integration).</p>
+        <p className="text-sm text-base-content/70">Kelola verifikasi pesanan, pengiriman, dan status tagihan.</p>
       </div>
 
       {/* Filter & Search Bar */}
@@ -108,7 +109,7 @@ export default function AdminDashboard() {
         <div className="form-control w-full relative">
           <input 
             type="text" 
-            placeholder="🔍 Cari Resi (UUID)..." 
+            placeholder="🔍 Cari Resi / No HP..." 
             className="input input-bordered w-full focus:input-primary"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
@@ -118,18 +119,20 @@ export default function AdminDashboard() {
         
         <div className="flex gap-2">
           <select 
-            className="select select-bordered select-sm flex-1"
+            className="select select-bordered select-sm flex-1 text-xs md:text-sm"
             value={shippingFilter}
             onChange={(e) => setShippingFilter(e.target.value)}
           >
-            <option value="all">Kirim: Semua</option>
-            <option value="pending">⏳ Pending</option>
-            <option value="shipped">🚚 Shipped</option>
-            <option value="delivered">✅ Delivered</option>
+            <option value="all">Status: Semua</option>
+            <option value="pending_verification">⏳ Pending Verifikasi</option>
+            <option value="verified">🛡️ Verified (Disetujui)</option>
+            <option value="shipped">🚚 Shipped (OTW)</option>
+            <option value="delivered">✅ Delivered (Selesai)</option>
+            <option value="rejected">❌ Ditolak (Fiktif)</option>
           </select>
 
           <select 
-            className="select select-bordered select-sm flex-1"
+            className="select select-bordered select-sm flex-1 text-xs md:text-sm"
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
           >
@@ -153,11 +156,16 @@ export default function AdminDashboard() {
               <div className="flex justify-between items-start mb-2">
                 <div>
                   <h3 className="font-bold text-sm truncate max-w-[200px]" title={item.id_resi}>
-                    Resi: {item.id_resi}
+                    Resi: #{item.id_resi.slice(0, 8)}
                   </h3>
                   <p className="text-xs text-base-content/70 mt-1">
                     📍 {item.rute_muat} ➔ {item.rute_bongkar}
                   </p>
+                  {item.customer_phone && (
+                    <p className="text-xs text-success font-medium mt-1">
+                      📱 WA: {item.customer_phone}
+                    </p>
+                  )}
                   <p className="text-xs font-semibold text-primary mt-1">
                     Rp {item.total_harga?.toLocaleString('id-ID')} ({item.jarak_km} KM)
                   </p>
@@ -169,35 +177,64 @@ export default function AdminDashboard() {
                 </div>
               </div>
               
-              <div className="flex gap-2 mt-2">
-                <span className={`badge badge-sm ${
-                  item.status_kirim === 'delivered' ? 'badge-success' : item.status_kirim === 'shipped' ? 'badge-info' : 'badge-warning'
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className={`badge badge-sm font-semibold ${
+                  item.status_kirim === 'delivered' ? 'badge-success' : 
+                  item.status_kirim === 'verified' || item.status_kirim === 'shipped' ? 'badge-info' : 
+                  item.status_kirim === 'rejected' ? 'badge-error' : 'badge-warning'
                 }`}>
-                  Kirim: {item.status_kirim}
+                  Status: {item.status_kirim}
                 </span>
-                <span className={`badge badge-sm ${
+                <span className={`badge badge-sm font-semibold ${
                   item.status_bayar === 'paid' ? 'badge-success' : item.status_bayar === 'dp_paid' ? 'badge-primary' : 'badge-error'
                 }`}>
                   Bayar: {item.status_bayar}
                 </span>
               </div>
               
-              {/* Action Buttons */}
-              <div className="card-actions justify-end mt-4 border-t border-base-200 pt-3">
-                {item.status_kirim !== 'delivered' && (
+              {/* Action Buttons (Anti-Fiktif & Pengiriman) */}
+              <div className="card-actions justify-end mt-4 border-t border-base-200 pt-3 flex-wrap gap-2">
+                {item.status_kirim === 'pending_verification' && (
+                  <>
+                    <button 
+                      onClick={() => handleUpdate(item.id_resi, 'kirim', 'verified')}
+                      className="btn btn-success btn-xs text-white"
+                    >
+                      ✓ Setujui (Verify)
+                    </button>
+                    <button 
+                      onClick={() => handleUpdate(item.id_resi, 'kirim', 'rejected')}
+                      className="btn btn-error btn-xs text-white"
+                    >
+                      ✕ Tolak (Fiktif)
+                    </button>
+                  </>
+                )}
+
+                {item.status_kirim === 'verified' && (
                   <button 
-                    onClick={() => handleUpdate(item.id_resi, 'kirim', 'delivered')}
+                    onClick={() => handleUpdate(item.id_resi, 'kirim', 'shipped')}
                     className="btn btn-outline btn-info btn-xs"
                   >
-                    Tandai Dikirim
+                    🚚 Berangkatkan (Shipped)
                   </button>
                 )}
+
+                {item.status_kirim === 'shipped' && (
+                  <button 
+                    onClick={() => handleUpdate(item.id_resi, 'kirim', 'delivered')}
+                    className="btn btn-outline btn-success btn-xs"
+                  >
+                    ✅ Tandai Selesai (Delivered)
+                  </button>
+                )}
+
                 {item.status_bayar !== 'paid' && (
                   <button 
                     onClick={() => handleUpdate(item.id_resi, 'bayar', 'paid')}
                     className="btn btn-primary btn-xs"
                   >
-                    Tandai Lunas
+                    💰 Tandai Lunas
                   </button>
                 )}
               </div>
