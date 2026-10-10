@@ -30,10 +30,11 @@ export default function LogistikPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Gagal menghitung jarak dari server.");
+        throw new Error(data.message || "Gagal menghitung jarak dari server.");
       }
 
-      setJarakKm(data.distance_km);
+      // Mengambil nilai distance_km dari properti data di dalam respons JSON backend
+      setJarakKm(data.data.distance_km);
     } catch (err: any) {
       alert(err.message || "Terjadi kesalahan saat menghubungi API Maps.");
     } finally {
@@ -105,7 +106,7 @@ export default function LogistikPage() {
                 {jarakKm !== "" && (
                   <p className="text-xs text-success font-medium mt-2">✓ Jarak terkalkulasi: {jarakKm} KM</p>
                 )}
-                <input type="hidden" name="jarak_km" value={jarakKm} />
+                <input type="hidden" name="jarak_km" value={jarakKm.toString()} />
               </div>
             </div>
 
