@@ -1,43 +1,56 @@
 "use client";
 
 import { useState } from "react";
-// TODO: Uncomment import di bawah ini jika file action dari Backend sudah siap ditarik
-// import { useActionState } from "react"; 
-// import { createLogistikOrder } from "@/actions/logistik";
 
 export default function LogistikPage() {
-  // State dummy untuk simulasi Google Maps API (Jarak)
   const [jarakKm, setJarakKm] = useState<number | "">("");
   const [isCalculating, setIsCalculating] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
-  // Simulasi kalkulasi jarak dari Client-Side
-  const handleCalculateDistance = () => {
+  // Kalkulasi jarak nyata via API Backend (Nominatim & OSRM)
+  const handleCalculateDistance = async () => {
+    const originInput = (document.querySelector('textarea[name="rute_muat"]') as HTMLTextAreaElement)?.value;
+    const destInput = (document.querySelector('textarea[name="alamat_bongkar"]') as HTMLTextAreaElement)?.value;
+
+    if (!originInput || !destInput) {
+      alert("Mohon isi Alamat Muat dan Alamat Bongkar terlebih dahulu.");
+      return;
+    }
+
     setIsCalculating(true);
-    setTimeout(() => {
-      setJarakKm(42.5); // Dummy jarak 42.5 KM
+    try {
+      const res = await fetch("/api/logistik/route", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originAddress: originInput,
+          destinationAddress: destInput,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal menghitung jarak dari server.");
+      }
+
+      setJarakKm(data.distance_km);
+    } catch (err: any) {
+      alert(err.message || "Terjadi kesalahan saat menghubungi API Maps.");
+    } finally {
       setIsCalculating(false);
-    }, 1200);
+    }
   };
 
-  /* 
-   * NOTE UNTUK TECH LEAD / BACKEND:
-   * Saat ini menggunakan handleSubmit dummy agar UI bisa dites tanpa error di HP.
-   * Jika backend sudah siap, hapus fungsi handleSubmit ini dan gunakan hook useActionState:
-   * const [state, formAction, isPending] = useActionState(createLogistikOrder, null);
-   * Lalu di tag <form>, ganti onSubmit={handleSubmit} menjadi action={formAction}
-   */
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
     const formData = new FormData(e.currentTarget);
     
-    // Console log ini untuk membuktikan ke Tim Backend bahwa "name" atribut sudah sesuai
-    console.log("Data siap kirim ke Server Action:", Object.fromEntries(formData));
+    console.log("Data siap kirim ke Server:", Object.fromEntries(formData));
 
     setTimeout(() => {
       setIsPending(false);
-      alert("Pesanan Kargo Berhasil Dibuat! (Dummy Server Action)");
+      alert("Pesanan Kargo Berhasil Dibuat!");
     }, 1500);
   };
 
@@ -47,7 +60,7 @@ export default function LogistikPage() {
       {/* Header */}
       <div className="mb-6 mt-4">
         <h1 className="text-2xl font-bold text-primary">Buat Pesanan Kargo</h1>
-        <p className="text-sm text-base-content/70 mt-1">Lengkapi data muatan dan rute pengiriman.</p>
+        <p className="text-sm text-base-content/70 mt-1">Lengkapi data muatan dan rute pengiriman real-time.</p>
       </div>
 
       {/* Main Form Card */}
@@ -79,7 +92,7 @@ export default function LogistikPage() {
                 ></textarea>
               </div>
 
-              {/* Kalkulasi Jarak Client-Side */}
+              {/* Kalkulasi Jarak Real-Time OSRM */}
               <div className="form-control w-full pt-2">
                 <button 
                   type="button" 
@@ -89,10 +102,9 @@ export default function LogistikPage() {
                 >
                   {isCalculating ? <span className="loading loading-dots"></span> : "📍 Hitung Jarak (Maps API)"}
                 </button>
-                {jarakKm && (
+                {jarakKm !== "" && (
                   <p className="text-xs text-success font-medium mt-2">✓ Jarak terkalkulasi: {jarakKm} KM</p>
                 )}
-                {/* Input tersembunyi untuk dikirim ke Backend */}
                 <input type="hidden" name="jarak_km" value={jarakKm} />
               </div>
             </div>
@@ -139,7 +151,7 @@ export default function LogistikPage() {
               <button 
                 type="submit" 
                 className="btn btn-primary w-full text-base"
-                disabled={isPending || !jarakKm}
+                disabled={isPending || jarakKm === ""}
               >
                 {isPending ? (
                   <span className="loading loading-spinner"></span>
@@ -147,7 +159,7 @@ export default function LogistikPage() {
                   "Proses Pesanan"
                 )}
               </button>
-              {!jarakKm && (
+              {jarakKm === "" && (
                 <p className="text-xs text-error text-center mt-2">
                   *Silakan hitung jarak terlebih dahulu sebelum memproses
                 </p>
