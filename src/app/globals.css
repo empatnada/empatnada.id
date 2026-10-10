@@ -3,19 +3,27 @@
 
 @layer base {
   :root {
-    --p: 355 91% 45%;
+    --p: 355 91% 45%;  /* #E30613 */
     --pf: 355 91% 38%;
     --pc: 0 0% 100%;
+    --b1: 0 0% 6%;     /* Karbon Pekat #0F1115 */
+    --b2: 0 0% 10%;    /* Karbon Lebih Terang Sedikit */
+    --b3: 0 0% 15%;
+    --n: 0 0% 100%;
+    --nc: 0 0% 6%;
+    --bc: 0 0% 90%;    /* Teks Putih/Abu Terang */
   }
 }
 
-/* Definisi kustom untuk logistik-theme */
+/* Modul Logistik & Landing Page: SpaceX Industrial Dark Theme */
 [data-theme="logistik-theme"] {
-  --color-primary: #E30613;
-  --color-primary-focus: #C20510;
-  --color-primary-content: #ffffff;
-  --color-base-100: #ffffff;
-  --color-base-200: #F3F4F6;
-  --color-secondary: #1A1A1A;
-  --color-accent: #D29F68;
+  --p: 355 91% 45%;   /* #E30613 */
+  --pf: 355 91% 38%;
+  --pc: 0 0% 100%;
+  --b1: 0 0% 6%;      /* #0F1115 Karbon Pekat */
+  --b2: 0 0% 10%;     /* #1A1A1A Card Dark */
+  --b3: 0 0% 16%;
+  --bc: 0 0% 95%;     /* Teks Bersih #FFFFFF */
+  --s: 0 0% 100%;
+  --a: 33 55% 58%;    /* #D29F68 */
 }
