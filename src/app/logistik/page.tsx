@@ -4,8 +4,10 @@ import { useState } from "react";
 
 export default function LogistikPage() {
   const [jarakKm, setJarakKm] = useState<number | "">("");
+  const [isFallback, setIsFallback] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isPending, setIsPending] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
   // Kalkulasi jarak nyata via API Backend (Nominatim & OSRM)
   const handleCalculateDistance = async () => {
@@ -33,8 +35,8 @@ export default function LogistikPage() {
         throw new Error(data.message || "Gagal menghitung jarak dari server.");
       }
 
-      // Mengambil nilai distance_km dari properti data di dalam respons JSON backend
       setJarakKm(data.data.distance_km);
+      setIsFallback(data.data.is_fallback || false);
     } catch (err: any) {
       alert(err.message || "Terjadi kesalahan saat menghubungi API Maps.");
     } finally {
@@ -42,17 +44,49 @@ export default function LogistikPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Kirim data pesanan ke backend (logistik_orders) dengan status pending_verification
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsPending(true);
-    const formData = new FormData(e.currentTarget);
-    
-    console.log("Data siap kirim ke Server:", Object.fromEntries(formData));
+    setSuccessMessage("");
 
-    setTimeout(() => {
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const payload = {
+      origin_address: formData.get("rute_muat"),
+      destination_address: formData.get("alamat_bongkar"),
+      distance_km: Number(formData.get("jarak_km")),
+      is_fallback: isFallback,
+      weight_kg: Number(formData.get("berat_kg")),
+      dimension_p: Number(formData.get("dimensi_p")),
+      dimension_l: Number(formData.get("dimensi_l")),
+      dimension_t: Number(formData.get("dimensi_t")),
+      customer_phone: formData.get("customer_phone"), // Anti-Fiktif WhatsApp
+      needs_tkbm: formData.get("layanan_tkbm") === "true",
+      needs_toll: formData.get("layanan_tol") === "true",
+    };
+
+    try {
+      const res = await fetch("/api/admin/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || "Gagal menyimpan pesanan ke server.");
+      }
+
+      setSuccessMessage("Pesanan Berhasil Dibuat! Menunggu Verifikasi Admin.");
+      form.reset();
+      setJarakKm("");
+    } catch (err: any) {
+      alert(err.message || "Terjadi kesalahan saat mengirim pesanan.");
+    } finally {
       setIsPending(false);
-      alert("Pesanan Kargo Berhasil Dibuat!");
-    }, 1500);
+    }
   };
 
   return (
@@ -110,10 +144,15 @@ export default function LogistikPage() {
               </div>
             </div>
 
-            {/* --- SECTION 2: SPESIFIKASI BARANG --- */}
+            {/* --- SECTION 2: SPESIFIKASI BARANG & KONTAK --- */}
             <div className="space-y-3">
-              <h2 className="text-lg font-bold border-b pb-1 border-base-300">2. Spesifikasi Muatan</h2>
+              <h2 className="text-lg font-bold border-b pb-1 border-base-300">2. Spesifikasi & Kontak</h2>
               
+              <div className="form-control w-full">
+                <label className="label px-0 py-1"><span className="label-text font-semibold">Nomor WhatsApp (Verifikasi)</span></label>
+                <input type="tel" name="customer_phone" className="input input-bordered w-full focus:input-primary" placeholder="Contoh: 081234567890" required />
+              </div>
+
               <div className="form-control w-full">
                 <label className="label px-0 py-1"><span className="label-text font-semibold">Berat Total (Kg)</span></label>
                 <input type="number" name="berat_kg" className="input input-bordered w-full focus:input-primary" placeholder="Misal: 1500" required />
@@ -160,7 +199,12 @@ export default function LogistikPage() {
                   "Proses Pesanan"
                 )}
               </button>
-              {jarakKm === "" && (
+              {successMessage && (
+                <p className="text-xs text-success font-semibold text-center mt-2">
+                  {successMessage}
+                </p>
+              )}
+              {jarakKm === "" && !successMessage && (
                 <p className="text-xs text-error text-center mt-2">
                   *Silakan hitung jarak terlebih dahulu sebelum memproses
                 </p>
